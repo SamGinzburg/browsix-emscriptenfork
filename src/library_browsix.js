@@ -557,9 +557,68 @@ var BrowsixLibrary = {
       };
       exports.__syscall102 = function(which, varargs) { // socketcall
         SYSCALLS.varargs = varargs;
-        console.log('TODO: socketcall');
-        abort('unsupported syscall socketcall');
-        return -ERRNO_CODES.EPERM;
+        let call = SYSCALLS.get(), args = SYSCALLS.get(), err = 0;
+        let SYS_SOCKET_FLAG = 1, SYS_SOCKET = 359;
+        let SYS_BIND_FLAG = 2, SYS_BIND = 361;
+        let SYS_CONNECT_FLAG = 3, SYS_CONNECT = 362;
+        let SYS_LISTEN_FLAG = 4, SYS_LISTEN = 363;
+        let SYS_ACCEPT_FLAG = 5, SYS_ACCEPT = 364;
+        let SYS_GETSOCKNAME_FLAG = 6, SYS_GETSOCKNAME = 51;
+        let SYS_GETPEERNAME_FLAG = 7, SYS_GETPEERNAME = 52;
+        let SYS_SETSOCKOPT_FLAG = 14, SYS_SOCKOPT = 54;
+        let SYS_SENDMSG_FLAG = 16;
+        let SYS_ACCEPT4_FLAG = 364;
+
+        console.log(call);
+        console.log(args);
+
+        debugger;
+
+        switch (call) {
+          case SYS_SOCKET_FLAG:
+            let a0 = HEAPU32[args/4];
+            let a1 = HEAPU32[(args/4)+1];
+            let a2 = HEAPU32[(args/4)+2];
+            err = BROWSIX.browsix.syscall.sync(SYS_SOCKET, a0, a1, a2);
+            break;
+          case SYS_BIND_FLAG:
+            let bind_sockfd = HEAPU32[args/4];
+            let bind_bufferPtr = HEAPU32[(args/4)+1];
+            let bind_bufferLen = HEAPU32[(args/4)+2];
+            err = BROWSIX.browsix.syscall.sync(SYS_BIND, bind_sockfd, bind_bufferPtr, bind_bufferLen);
+            break;
+          case SYS_CONNECT_FLAG:
+            let connect_sockfd = HEAPU32[args/4];
+            let connect_bufferPtr = HEAPU32[(args/4)+1];
+            let connect_bufferLen = HEAPU32[(args/4)+2];
+            let shm_connect_bufferPtr = BROWSIX.browsix.getShmAt(connect_bufferPtr, connect_bufferLen);
+            BROWSIX.browsix.copyFromUser(shm_connect_bufferPtr, connect_bufferPtr);
+            err = BROWSIX.browsix.syscall.sync(SYS_CONNECT, connect_sockfd, connect_bufferPtr, connect_bufferLen);
+            break;
+          case SYS_LISTEN_FLAG:
+            err = BROWSIX.browsix.syscall.sync(SYS_LISTEN, 0, 0, 0);
+            break;
+          case SYS_ACCEPT_FLAG:
+            err = BROWSIX.browsix.syscall.sync(SYS_ACCEPT, 0, 0, 0);
+            break;          
+          case SYS_GETSOCKNAME_FLAG:
+            err = BROWSIX.browsix.syscall.sync(SYS_GETSOCKNAME, 0, 0, 0);
+            break;
+          case SYS_GETPEERNAME_FLAG:
+            err = BROWSIX.browsix.syscall.sync(SYS_GETPEERNAME, 0, 0, 0);
+            break;
+          case SYS_SETSOCKOPT_FLAG:
+            err = BROWSIX.browsix.syscall.sync(SYS_SOCKOPT, 0, 0, 0);
+            break;   
+          case SYS_SENDMSG_FLAG:
+            break;      
+          case SYS_ACCEPT4_FLAG:
+            err = BROWSIX.browsix.syscall.sync(SYS_ACCEPT, 0, 0, 0);
+            break;      
+          default:
+            err = -1;
+        }
+        return err;
       }
       exports.__syscall140 = function(which, varargs) { // llseek
         SYSCALLS.varargs = varargs;
@@ -655,6 +714,26 @@ var BrowsixLibrary = {
         let how = SYSCALLS.get(), set = SYSCALLS.get(), oldset = SYSCALLS.get();
         return BROWSIX.browsix.syscall.sync(SYS_SIGPROCMASK, how, set, oldset);
       };
+      exports.__syscall180 = function(which, varargs) { // pread64
+        debugger;
+        SYSCALLS.varargs = varargs;
+        let SYS_PREAD64 = 180;
+        let fd = SYSCALLS.get(), bufp = SYSCALLS.get(), count = SYSCALLS.get(), offset = SYSCALLS.get();
+        let shm_pread_bufferPtr = BROWSIX.browsix.getShmAt(bufp, count);
+        BROWSIX.browsix.copyFromUser(shm_pread_bufferPtr, bufp);
+        let readcount = BROWSIX.browsix.syscall.sync(SYS_PREAD64, fd, bufp, count, offset);
+        BROWSIX.browsix.copyToUser(bufp, shm_pread_bufferPtr, shm_pread_bufferPtr.length);
+        return readcount;
+      };
+      exports.__syscall181 = function(which, varargs) { // pwrite64
+        debugger;
+        SYSCALLS.varargs = varargs;
+        let SYS_PWRITE64 = 181;
+        let fd = SYSCALLS.get(), bufp = SYSCALLS.get(), count = SYSCALLS.get(), pos = SYSCALLS.get();
+        let shm_pwrite_bufferPtr = BROWSIX.browsix.getShmAt(bufp, count);
+        BROWSIX.browsix.copyFromUser(shm_pwrite_bufferPtr, bufp);
+        return BROWSIX.browsix.syscall.sync(SYS_PWRITE64, fd, bufp, count, pos);
+      };
       exports.__syscall183 = function(which, varargs) { // getcwd
         SYSCALLS.varargs = varargs;
         let SYS_GETCWD = 183;
@@ -697,7 +776,7 @@ var BrowsixLibrary = {
         let path_off = BROWSIX.browsix.SHM_OFF;
         let buf_off = BROWSIX.browsix.putShmString(path_off, path);
         let shmBuf = BROWSIX.browsix.getShmAt(buf_off, {{{ C_STRUCTS.stat.__size__ }}});
-        let ret = BROWSIX.browsix.syscall.sync(SYS_FSTAT, path_off, buf_off);
+        let ret = BROWSIX.browsix.syscall.sync(SYS_FSTAT, path, buf_off);
         if (ret === 0)
           BROWSIX.browsix.copyToUser(ptr, shmBuf, shmBuf.length);
         return ret;

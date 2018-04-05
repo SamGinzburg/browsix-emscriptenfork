@@ -1867,7 +1867,6 @@ LibraryManager.library = {
     return 0; // NULL
   },
 
-
   // ==========================================================================
   // time.h
   // ==========================================================================
@@ -3942,29 +3941,6 @@ LibraryManager.library = {
     addrPool: [            0x0200000a, 0x0300000a, 0x0400000a, 0x0500000a,
                0x0600000a, 0x0700000a, 0x0800000a, 0x0900000a, 0x0a00000a,
                0x0b00000a, 0x0c00000a, 0x0d00000a, 0x0e00000a] /* 0x0100000a is reserved */
-  },
-
-  // pwd.h
-
-  getpwnam__deps: ['__setErrNo', '$ERRNO_CODES'],
-  getpwnam: function() {
-    ___setErrNo(ERRNO_CODES.ENOENT);
-    return 0;
-  },
-  setpwent__deps: ['__setErrNo', '$ERRNO_CODES'],
-  setpwent: function() {
-    ___setErrNo(ERRNO_CODES.ENOENT);
-    return 0;
-  },
-  getpwent__deps: ['__setErrNo', '$ERRNO_CODES'],
-  getpwent: function() {
-    ___setErrNo(ERRNO_CODES.ENOENT);
-    return 0;
-  },
-  endpwent__deps: ['__setErrNo', '$ERRNO_CODES'],
-  endpwent: function() {
-    ___setErrNo(ERRNO_CODES.ENOENT);
-    return 0;
   },
 
   // ==========================================================================

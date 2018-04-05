@@ -39,8 +39,8 @@ int __getgr_a(const char *name, gid_t gid, struct group *gr, char **buf, size_t 
 		}
 	}
 	fclose(f);
-
-	if (!*res && (rv == 0 || rv == ENOENT || rv == ENOTDIR)) {
+	if (0) { // skip nscd lookup
+	//if (!*res && (rv == 0 || rv == ENOENT || rv == ENOTDIR)) {
 		int32_t req = name ? GETGRBYNAME : GETGRBYGID;
 		int32_t i;
 		const char *key;
