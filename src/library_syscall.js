@@ -1276,10 +1276,10 @@ var SyscallsLibrary = {
   __syscall340: function(which, varargs) { // prlimit64
     var pid = SYSCALLS.get(), resource = SYSCALLS.get(), new_limit = SYSCALLS.get(), old_limit = SYSCALLS.get();
     if (old_limit) { // just report no limits
-      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_cur, '-1', 'i32') }}};  // RLIM_INFINITY
-      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_cur + 4, '-1', 'i32') }}};  // RLIM_INFINITY
-      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_max, '-1', 'i32') }}};  // RLIM_INFINITY
-      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_max + 4, '-1', 'i32') }}};  // RLIM_INFINITY
+      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_cur, '100000', 'i32') }}};  // RLIM_INFINITY
+      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_cur + 4, '100000', 'i32') }}};  // RLIM_INFINITY
+      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_max, '100000', 'i32') }}};  // RLIM_INFINITY
+      {{{ makeSetValue('old_limit', C_STRUCTS.rlimit.rlim_max + 4, '100000', 'i32') }}};  // RLIM_INFINITY
     }
     return 0;
   },

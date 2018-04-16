@@ -121,8 +121,11 @@ var BrowsixLibrary = {
           if (paranoid !== 1 && paranoid !== 0) {
             Module.printErr('WARN: someone wrote over our futex alloc(' + waitOff + '): ' + paranoid);
             debugger;
+		  }
+		  let value = "timed-out";
+          while (value === "timed-out") {
+            value = Atomics.wait(BROWSIX.browsix.shm32, waitOff >> 2, 0, 100);
           }
-          Atomics.wait(BROWSIX.browsix.shm32, waitOff >> 2, 0);
           Atomics.store(BROWSIX.browsix.shm32, waitOff >> 2, 0);
           return Atomics.load(BROWSIX.browsix.shm32, (waitOff >> 2) + 1);
         };
@@ -563,9 +566,10 @@ var BrowsixLibrary = {
         let SYS_CONNECT_FLAG = 3, SYS_CONNECT = 362;
         let SYS_LISTEN_FLAG = 4, SYS_LISTEN = 363;
         let SYS_ACCEPT_FLAG = 5, SYS_ACCEPT = 364;
-        let SYS_GETSOCKNAME_FLAG = 6, SYS_GETSOCKNAME = 51;
+        let SYS_GETSOCKNAME_FLAG = 6, SYS_GETSOCKNAME = 1001;
         let SYS_GETPEERNAME_FLAG = 7, SYS_GETPEERNAME = 52;
-        let SYS_SETSOCKOPT_FLAG = 14, SYS_SOCKOPT = 54;
+		let SYS_SETSOCKOPT_FLAG = 14, SYS_SOCKOPT = 1000;
+		let SYS_RECVFROM_FLAG = 12, SYS_RECVFROM = 1002;	
         let SYS_SENDMSG_FLAG = 16;
         let SYS_ACCEPT4_FLAG = 364;
 
@@ -585,6 +589,8 @@ var BrowsixLibrary = {
             let bind_sockfd = HEAPU32[args/4];
             let bind_bufferPtr = HEAPU32[(args/4)+1];
             let bind_bufferLen = HEAPU32[(args/4)+2];
+            let shm_bind_bufferPtr = BROWSIX.browsix.getShmAt(bind_bufferPtr, bind_bufferLen);
+            BROWSIX.browsix.copyFromUser(shm_bind_bufferPtr, bind_bufferPtr);
             err = BROWSIX.browsix.syscall.sync(SYS_BIND, bind_sockfd, bind_bufferPtr, bind_bufferLen);
             break;
           case SYS_CONNECT_FLAG:
@@ -596,25 +602,68 @@ var BrowsixLibrary = {
             err = BROWSIX.browsix.syscall.sync(SYS_CONNECT, connect_sockfd, connect_bufferPtr, connect_bufferLen);
             break;
           case SYS_LISTEN_FLAG:
-            err = BROWSIX.browsix.syscall.sync(SYS_LISTEN, 0, 0, 0);
+            let listen_fd = HEAPU32[args/4];
+            let listen_backlog = HEAPU32[(args/4)+1];
+            err = BROWSIX.browsix.syscall.sync(SYS_LISTEN, listen_fd, listen_backlog);
             break;
           case SYS_ACCEPT_FLAG:
-            err = BROWSIX.browsix.syscall.sync(SYS_ACCEPT, 0, 0, 0);
-            break;          
+            let accept_fd = HEAPU32[args/4];
+            let accept_addr_ptr = HEAPU32[(args/4)+1];
+            let accept_addrlen = HEAPU32[(args/4)+2];
+            let shm_accept_bufferPtr = BROWSIX.browsix.getShmAt(accept_addr_ptr, HEAPU32[accept_addrlen >> 2]);
+            BROWSIX.browsix.copyFromUser(shm_accept_bufferPtr, accept_addr_ptr);
+            err = BROWSIX.browsix.syscall.sync(SYS_ACCEPT, accept_fd, accept_addr_ptr, HEAPU32[accept_addrlen >> 2], 0);
+            BROWSIX.browsix.copyToUser(accept_addr_ptr, shm_accept_bufferPtr, shm_accept_bufferPtr.length);
+            break;
           case SYS_GETSOCKNAME_FLAG:
-            err = BROWSIX.browsix.syscall.sync(SYS_GETSOCKNAME, 0, 0, 0);
+            let getsockname_fd = HEAPU32[args/4];
+            let getsockname_addr_ptr = HEAPU32[(args/4)+1];
+            let getsockname_addrlen = HEAPU32[(args/4)+2];
+            let shm_getsockname_bufferPtr = BROWSIX.browsix.getShmAt(getsockname_addr_ptr, getsockname_addrlen);
+            BROWSIX.browsix.copyFromUser(shm_getsockname_bufferPtr, getsockname_addr_ptr);
+            err = BROWSIX.browsix.syscall.sync(SYS_GETSOCKNAME, getsockname_fd, shm_getsockname_bufferPtr);
+            BROWSIX.browsix.copyToUser(getsockname_addr_ptr, shm_getsockname_bufferPtr, shm_getsockname_bufferPtr.length);
             break;
           case SYS_GETPEERNAME_FLAG:
-            err = BROWSIX.browsix.syscall.sync(SYS_GETPEERNAME, 0, 0, 0);
+            //err = BROWSIX.browsix.syscall.sync(SYS_GETPEERNAME, 0, 0, 0);
             break;
           case SYS_SETSOCKOPT_FLAG:
-            err = BROWSIX.browsix.syscall.sync(SYS_SOCKOPT, 0, 0, 0);
+            let sockfd = HEAPU32[args/4];
+            let level = HEAPU32[(args/4)+1];
+            let optname = HEAPU32[(args/4)+2];
+            let optval_ptr = HEAPU32[(args/4)+3];
+            let optlen = HEAPU32[(args/4)+4];
+            let shm_setsockopt_bufferPtr = BROWSIX.browsix.getShmAt(optval_ptr, optlen);
+            BROWSIX.browsix.copyFromUser(shm_setsockopt_bufferPtr, optval_ptr);
+            err = BROWSIX.browsix.syscall.sync(SYS_SOCKOPT, sockfd, level, optname, shm_setsockopt_bufferPtr);
             break;   
           case SYS_SENDMSG_FLAG:
             break;      
           case SYS_ACCEPT4_FLAG:
-            err = BROWSIX.browsix.syscall.sync(SYS_ACCEPT, 0, 0, 0);
-            break;      
+            let accept4_fd = HEAPU32[args/4];
+            let accept4_addr_ptr = HEAPU32[(args/4)+1];
+            let accept4_addrlen = HEAPU32[(args/4)+2];
+            let accept4_flags = HEAPU32[(args/4)+3];
+            let shm_accept4_bufferPtr = BROWSIX.browsix.getShmAt(accept4_addr_ptr, accept4_addrlen);
+            BROWSIX.browsix.copyFromUser(shm_accept4_bufferPtr, accept4_addr_ptr);
+            err = BROWSIX.browsix.syscall.sync(SYS_ACCEPT, accept4_fd, shm_accept4_bufferPtr, accept4_flags);
+            break;
+          case SYS_RECVFROM_FLAG:
+            let recvfrom_fd = HEAPU32[args/4];
+            let read_buf_ptr = HEAPU32[(args/4)+1];
+            let read_buf_len = HEAPU32[(args/4)+2];
+            let recvfrom_flags = HEAPU32[(args/4)+3];
+            let recvfrom_sockaddr_ptr = HEAPU32[(args/4)+4];
+            let recvfrom_sockaddr_len_ptr = HEAPU32[(args/4)+5];
+            let sockaddr_len = HEAPU32[recvfrom_sockaddr_len_ptr >> 2];
+            let read_buffer_shm = BROWSIX.browsix.getShmAt(read_buf_ptr, read_buf_len);
+            let sockaddr_shm = BROWSIX.browsix.getShmAt(recvfrom_sockaddr_ptr, sockaddr_len);
+            BROWSIX.browsix.copyFromUser(read_buffer_shm, read_buf_ptr);
+            err = BROWSIX.browsix.syscall.sync(SYS_RECVFROM, recvfrom_fd, read_buf_ptr, read_buf_len,
+                                               recvfrom_flags, recvfrom_sockaddr_ptr, sockaddr_len);
+            BROWSIX.browsix.copyToUser(read_buf_ptr, read_buffer_shm, read_buffer_shm.length);
+            BROWSIX.browsix.copyToUser(recvfrom_sockaddr_ptr, sockaddr_shm, sockaddr_shm.length);
+            break;
           default:
             err = -1;
         }
@@ -628,9 +677,13 @@ var BrowsixLibrary = {
       };
       exports.__syscall142 = function(which, varargs) { // newselect
         SYSCALLS.varargs = varargs;
-        console.log('TODO: socketcall');
-        abort('newselect not implemented');
-        return;
+        let SYS_SELECT = 142;
+        let nfds = SYSCALLS.get(), fd_set_ptr_read = SYSCALLS.get(), fd_set_ptr_write = SYSCALLS.get(), fd_set_ptr_except = SYSCALLS.get(), timeout_ptr = SYSCALLS.get();
+        
+        //let shm_poll_bufferPtr = BROWSIX.browsix.getShmAt(pollfd_ptr, numfds);
+        //BROWSIX.browsix.copyFromUser(shm_poll_bufferPtr, pollfd_ptr);
+        console.log("newselect called: TODO: implement this");
+        return BROWSIX.browsix.syscall.sync(SYS_SELECT, nfds, fd_set_ptr_read, fd_set_ptr_write, fd_set_ptr_except, timeout_ptr);
       };
       exports.__syscall145 = function(which, varargs) { // readv
         SYSCALLS.varargs = varargs;
@@ -691,11 +744,16 @@ var BrowsixLibrary = {
         }
         return ret;
       };
-      exports.__syscall168 = function(which, varargs) { // poll
+	  exports.__syscall168 = function(which, varargs) { // poll
+		debugger;
         SYSCALLS.varargs = varargs;
-        console.log('TODO: poll');
-        abort('poll not implemented');
-        return;
+        let SYS_POLL = 168;
+        let pollfd_ptr = SYSCALLS.get(), numfds = SYSCALLS.get(), timeout = SYSCALLS.get();
+        let shm_poll_bufferPtr = BROWSIX.browsix.getShmAt(pollfd_ptr, numfds * 64);
+        BROWSIX.browsix.copyFromUser(shm_poll_bufferPtr, pollfd_ptr);
+        let ret = BROWSIX.browsix.syscall.sync(SYS_POLL, pollfd_ptr, numfds, timeout);
+        BROWSIX.browsix.copyToUser(pollfd_ptr, shm_poll_bufferPtr, shm_poll_bufferPtr.length);
+        return ret;
       };
       exports.__syscall174 = function(which, varargs) { // rt_sigaction
         SYSCALLS.varargs = varargs;
@@ -715,7 +773,6 @@ var BrowsixLibrary = {
         return BROWSIX.browsix.syscall.sync(SYS_SIGPROCMASK, how, set, oldset);
       };
       exports.__syscall180 = function(which, varargs) { // pread64
-        debugger;
         SYSCALLS.varargs = varargs;
         let SYS_PREAD64 = 180;
         let fd = SYSCALLS.get(), bufp = SYSCALLS.get(), count = SYSCALLS.get(), offset = SYSCALLS.get();
@@ -744,6 +801,16 @@ var BrowsixLibrary = {
           return count;
         BROWSIX.browsix.copyToUser(ptr, shmBuf, count);
         return count;
+	  };
+	  exports.__syscall191 = function(which, varargs) { // getrlimit
+		SYSCALLS.varargs = varargs;
+		let SYS_GETRLIMIT = 191;
+		let resource = SYSCALLS.get(), rlim_ptr = SYSCALLS.get();
+		let rlim_buf_ptr = BROWSIX.browsix.getShmAt(rlim_ptr, 128);
+		BROWSIX.browsix.copyFromUser(rlim_buf_ptr, 128);
+		let ret = BROWSIX.browsix.syscall.sync(SYS_GETRLIMIT, resource, rlim_ptr);
+		BROWSIX.browsix.copyToUser(rlim_ptr, rlim_buf_ptr, rlim_buf_ptr.length);
+		return ret;
       };
       exports.__syscall195 = function(which, varargs) { // SYS_stat64
         SYSCALLS.varargs = varargs;
@@ -780,6 +847,14 @@ var BrowsixLibrary = {
         if (ret === 0)
           BROWSIX.browsix.copyToUser(ptr, shmBuf, shmBuf.length);
         return ret;
+      };
+      exports.__syscall212 = function(which, varargs) { // SYS_chown
+        SYSCALLS.varargs = varargs;
+        let SYS_CHOWN = 212;
+        let pathname_ptr = SYSCALLS.get(), owner = SYSCALLS.get(), group = SYSCALLS.get();
+        // TODO: implement chown in browsix + setup shared memory for the pathname_ptr
+        let ret = BROWSIX.browsix.syscall.sync(SYS_CHOWN, pathname_ptr, owner, group);
+        return 0;
       };
       exports.__syscall220 = function(which, varargs) { // SYS_getdents64
         SYSCALLS.varargs = varargs;
@@ -821,8 +896,23 @@ var BrowsixLibrary = {
         let SYS_PIPE2 = 41;
         let pipefd = SYSCALLS.get(), flags = SYSCALLS.get();
         return BROWSIX.browsix.syscall.sync(SYS_PIPE2, pipefd, flags);
-      };
-
+	  };
+	  exports.__syscall340 = function(which, varargs) { // prlimit64
+		// we will ignore the "set part now"
+		console.log("TODO: finish implementing prlimit64");
+		SYSCALLS.varargs = varargs;
+		let SYS_GETRLIMIT = 191;
+		var pid = SYSCALLS.get(), resource = SYSCALLS.get(), new_limit = SYSCALLS.get(), old_limit = SYSCALLS.get();
+		debugger;
+		if (old_limit) {
+			let rlim_buf_ptr = BROWSIX.browsix.getShmAt(old_limit, 128);
+			//BROWSIX.browsix.copyFromUser(old_limit, 128);
+			let ret = BROWSIX.browsix.syscall.sync(SYS_GETRLIMIT, resource, old_limit);
+			BROWSIX.browsix.copyToUser(old_limit, rlim_buf_ptr, rlim_buf_ptr.length);
+			return ret;
+		}
+		return 0;
+	  };
       return exports;
     }()),
   },
